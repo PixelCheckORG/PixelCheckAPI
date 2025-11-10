@@ -1,0 +1,12 @@
+Django==5.2.8
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1
+django-filter==24.3
+django-environ==0.11.2
+drf-spectacular==0.27.2
+celery==5.4.0
+redis==5.0.8
+mysqlclient==2.2.4; platform_system != "Windows"
+pymysql==1.1.1; platform_system == "Windows"
+Pillow==10.4.0
+reportlab==4.2.2
