@@ -9,7 +9,8 @@ from results.interface.serializers.result_serializers import ImageResultSerializ
 
 
 class ResultDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    # Permitir consulta sin autenticación (el endpoint expone solo datos del resultado).
+    permission_classes = [permissions.AllowAny]
     serializer_class = ImageResultSerializer
 
     @extend_schema(

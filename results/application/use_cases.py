@@ -11,6 +11,8 @@ from ingestion.models import Image, ImageData
 
 
 def _can_view_all(user) -> bool:
+    if not getattr(user, "is_authenticated", False):
+        return True
     return user.has_role(ROLE_PROFESSIONAL) or user.is_staff
 
 
@@ -20,9 +22,14 @@ class GetResultUseCase(UseCase):
 
     def execute(self, requester, image_id: str) -> UseCaseResult:
         can_view = _can_view_all(requester)
-        entity = self.repository.get_by_image(image_id=image_id, owner_id=str(requester.id), can_view_all=can_view)
+        owner_id = str(requester.id) if getattr(requester, "is_authenticated", False) else None
+        entity = self.repository.get_by_image(image_id=image_id, owner_id=owner_id, can_view_all=can_view)
         if not entity:
             raise NotFoundError("Resultado no disponible (en proceso o no existe)")
+
+        include_report = getattr(requester, "is_authenticated", False) and (
+            requester.has_role(ROLE_PROFESSIONAL) or requester.is_staff
+        )
         return UseCaseResult(
             success=True,
             data={
@@ -31,7 +38,7 @@ class GetResultUseCase(UseCase):
                 "confidence": entity.confidence,
                 "modelVersion": entity.model_version,
                 "details": entity.details,
-                "reportId": self._find_report_for_image(entity.image_id, requester) if can_view else None,
+                "reportId": self._find_report_for_image(entity.image_id, requester) if include_report else None,
             },
         )
 

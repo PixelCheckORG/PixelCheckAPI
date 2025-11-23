@@ -1,9 +1,9 @@
 from decimal import Decimal
-from random import Random
 
 from django.conf import settings
 
 from analysis.domain.repositories import AnalysisResultRepository
+from analysis.ml.inference import PixelCheckInference
 from ingestion.models import Image
 from results.application.use_cases import CreateReportUseCase
 from results.infrastructure.repositories import DjangoReportRepository, DjangoResultsQueryRepository
@@ -15,36 +15,7 @@ from iam.domain.value_objects import ROLE_PROFESSIONAL
 class AnalyzeImageUseCase(UseCase):
     def __init__(self, repository: AnalysisResultRepository):
         self.repository = repository
-
-    def _build_details(self, checksum_value: int) -> dict:
-        rnd = Random(checksum_value)
-        color = round(rnd.uniform(0.4, 1.0), 2)
-        noise = round(rnd.uniform(0.0, 0.6), 2)
-        transparency = round(rnd.uniform(0.0, 0.2), 2)
-        watermark = round(rnd.uniform(0.0, 0.3), 2)
-        symmetry = round(rnd.uniform(0.4, 1.0), 2)
-        features = {
-            "color_score": color,
-            "noise_score": noise,
-            "transparency_score": transparency,
-            "watermark_score": watermark,
-            "symmetry_score": symmetry,
-        }
-        conclusion = (
-            "Rasgos visuales naturales, baja probabilidad de IA"
-            if symmetry > 0.5 and watermark < 0.15
-            else "Patrones sospechosos de síntesis, revisar con cautela"
-        )
-        return {
-            "features": features,
-            "conclusion": conclusion,
-            "observations": {
-                "colors": f"Diversidad cromática estimada {int(color*100)}%",
-                "noise": f"Nivel de ruido {int(noise*100)}%",
-                "watermark": f"Huellas de marca {int(watermark*100)}%",
-                "symmetry": f"Simetría {int(symmetry*100)}%",
-            },
-        }
+        self.inference = PixelCheckInference.instance()
 
     def execute(self, image_id: str) -> UseCaseResult:
         try:
@@ -52,10 +23,10 @@ class AnalyzeImageUseCase(UseCase):
         except Image.DoesNotExist as exc:
             raise NotFoundError("Imagen no encontrada") from exc
 
-        checksum_value = int(image.checksum[:6], 16)
-        label = "AI" if checksum_value % 2 == 0 else "REAL"
-        confidence = Decimal(checksum_value % 100) / Decimal(100)
-        details = self._build_details(checksum_value)
+        # Carga el binario de la imagen y ejecuta inferencia real
+        image_bytes = bytes(image.data.content)
+        label, confidence_float, details = self.inference.predict(image_bytes)
+        confidence = Decimal(str(confidence_float))
 
         entity = self.repository.save_result(
             image=image,

@@ -42,3 +42,11 @@ celery -A config worker -l info
 
 ## para windows 
 celery -A config worker -l info -P solo -n worker1@%h
+
+
+
+celery -A config worker -l info
+
+
+## correr el back
+python manage.py runserver
