@@ -13,9 +13,6 @@ class UploadImageUseCase(UseCase):
     def execute(self, uploader, uploaded_file):
         image = ensure_valid_image(uploaded_file)
         checksum = calculate_checksum(uploaded_file.file)
-        if self.repository.exists_checksum(checksum=checksum, uploader_id=str(uploader.id)):
-            raise ValidationError("Ya existe una imagen con el mismo checksum")
-
         binary_data = uploaded_file.read()
         payload = {
             "uploader": uploader,

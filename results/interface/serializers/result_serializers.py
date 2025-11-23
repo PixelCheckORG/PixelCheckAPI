@@ -5,8 +5,13 @@ class ImageResultSerializer(serializers.Serializer):
     label = serializers.CharField()
     confidence = serializers.FloatField()
     modelVersion = serializers.CharField(source="model_version")
+    details = serializers.JSONField(required=False)
 
 
 class ReportRequestSerializer(serializers.Serializer):
     imageId = serializers.UUIDField()
     format = serializers.ChoiceField(choices=("PDF", "CSV"), default="PDF")
+
+
+class ReportResponseSerializer(serializers.Serializer):
+    reportId = serializers.UUIDField()

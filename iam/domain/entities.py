@@ -13,6 +13,6 @@ class RoleEntity:
 @dataclass
 class UserEntity:
     id: str
-    email: str
+    email: str | None
     username: str
     roles: List[RoleEntity]
