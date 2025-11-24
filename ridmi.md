@@ -14,6 +14,7 @@ pip install -r requirements.txt
 .\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000
 .\.venv\Scripts\activate
 celery -A config worker -l info
+```
 
 ## 3. instalar depenendicas
 
@@ -50,3 +51,75 @@ celery -A config worker -l info
 
 ## correr el back
 python manage.py runserver
+
+
+
+
+```gitignore
+
+### git ignore
+
+# Environment variables
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+static_root/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# ML Models (si son muy grandes)
+*.h5
+*.pkl
+*.joblib
+models/*.h5
+models/*.pkl
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+```

@@ -12,3 +12,4 @@ Pillow==10.4.0
 reportlab==4.2.2
 torch>=2.2.0
 torchvision>=0.17.0
+psycopg2-binary>=2.9.9
