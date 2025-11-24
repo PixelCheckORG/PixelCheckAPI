@@ -14,15 +14,19 @@ def _to_user_entity(user: User) -> UserEntity:
 
 
 class DjangoUserRepository(UserRepository):
-    def create_user(self, email: str, username: str, password: str) -> UserEntity:
-        user = User.objects.create_user(email=email, username=username, password=password)
-        default_role, _ = Role.objects.get_or_create(name=Role.RoleName.USER)
-        user.roles.add(default_role)
+    def create_user(self, username: str, password: str, roles: list[str]) -> UserEntity:
+        user = User.objects.create_user(username=username, password=password)
+        roles_to_set = roles or [Role.RoleName.USER]
+        role_objs = []
+        for role_name in roles_to_set:
+            role_obj, _ = Role.objects.get_or_create(name=role_name)
+            role_objs.append(role_obj)
+        user.roles.add(*role_objs)
         return _to_user_entity(user)
 
-    def get_by_email(self, email: str) -> UserEntity | None:
+    def get_by_username(self, username: str) -> UserEntity | None:
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(username=username)
         except User.DoesNotExist:
             return None
         return _to_user_entity(user)

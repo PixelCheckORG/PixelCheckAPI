@@ -9,4 +9,5 @@ class AnalysisResultEntity:
     label: str
     confidence: float
     model_version: str
+    details: dict
     processed_at: str

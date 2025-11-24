@@ -1,0 +1,28 @@
+{
+  "classes": [
+    "ai",
+    "real"
+  ],
+  "ai_class_index": 0,
+  "best_val_auc": 0.9271610355419044,
+  "best_val_f1": 0.8627450980392157,
+  "val_metrics": {
+    "loss": 0.3519887427488963,
+    "acc": 0.8541666666666666,
+    "auc": 0.9271610355419044,
+    "f1": 0.8627450980392157
+  },
+  "test_metrics": {
+    "loss": 0.28193389251828194,
+    "acc": 0.8787878787878788,
+    "auc": 0.9351239669421487,
+    "f1": 0.8867924528301887
+  },
+  "hyperparams": {
+    "epochs": 8,
+    "batch_size": 32,
+    "lr": 0.0003,
+    "weight_decay": 0.0001
+  },
+  "notes": "EfficientNet-B0 finetune; clase positiva = ai."
+}

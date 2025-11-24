@@ -11,6 +11,7 @@ def _to_entity(instance: AnalysisResult) -> AnalysisResultEntity:
         label=instance.label,
         confidence=float(instance.confidence),
         model_version=instance.model_version,
+        details=instance.details or {},
         processed_at=instance.processed_at.isoformat(),
     )
 

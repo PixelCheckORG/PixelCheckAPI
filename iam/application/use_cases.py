@@ -1,5 +1,5 @@
 from django.contrib.auth import authenticate
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken
 
 from shared.application.use_case import UseCase, UseCaseResult
 from shared.domain.exceptions import ValidationError
@@ -11,25 +11,23 @@ class RegisterUserUseCase(UseCase):
     def __init__(self, repository: UserRepository):
         self.repository = repository
 
-    def execute(self, email: str, username: str, password: str) -> UseCaseResult:
-        if self.repository.get_by_email(email):
-            return UseCaseResult(success=False, error="Email ya registrado")
-        user = self.repository.create_user(email=email, username=username, password=password)
+    def execute(self, username: str, password: str, roles: list[str]) -> UseCaseResult:
+        if self.repository.get_by_username(username):
+            return UseCaseResult(success=False, error="Username ya registrado")
+        user = self.repository.create_user(username=username, password=password, roles=roles)
         return UseCaseResult(success=True, data=user)
 
 
 class SignInUseCase(UseCase):
-    def execute(self, email: str, password: str) -> UseCaseResult:
-        user = authenticate(username=email, password=password)
+    def execute(self, username: str, password: str) -> UseCaseResult:
+        user = authenticate(username=username, password=password)
         if not user:
             raise ValidationError("Credenciales inválidas")
-        refresh = RefreshToken.for_user(user)
+        access_token = AccessToken.for_user(user)
         payload = {
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+            "access": str(access_token),
             "user": {
                 "id": str(user.id),
-                "email": user.email,
                 "username": user.username,
                 "roles": list(user.roles.values_list("name", flat=True)),
             },

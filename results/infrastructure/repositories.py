@@ -13,6 +13,7 @@ def _result_entity(instance: AnalysisResult) -> ResultEntity:
         label=instance.label,
         confidence=float(instance.confidence),
         model_version=instance.model_version,
+        details=instance.details or {},
     )
 
 

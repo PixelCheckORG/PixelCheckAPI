@@ -7,6 +7,7 @@ class ResultEntity:
     label: str
     confidence: float
     model_version: str
+    details: dict | None = None
 
 
 @dataclass

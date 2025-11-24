@@ -55,8 +55,7 @@ python manage.py runserver
 - `POST /api/v1/auth-sign-in` – Obtención de tokens JWT.
 - `POST /api/v1/images/upload` – Sube la imagen, valida y encola análisis.
 - `GET /api/v1/results/{imageId}` – Consulta label/confidence/modelVersion.
-- `POST /api/v1/reports` – (ROLE_PROFESSIONAL o staff) genera PDF o CSV.
-- `GET /api/v1/reports/{reportId}` – Descarga reporte listo.
+- `GET /api/v1/reports/{reportId}` – Descarga reporte listo (se genera automático si eres ROLE_PROFESSIONAL o staff).
 - `GET /api/v1/analysis/health` – Información del modelo.
 - `POST /api/v1/system/audit` – Registra eventos (autenticado).
 - `GET /api/v1/system/audit` – Solo staff (admin Django) para revisar auditoría.

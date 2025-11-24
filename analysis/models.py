@@ -19,6 +19,7 @@ class AnalysisResult(models.Model):
     label = models.CharField(max_length=8, choices=Label.choices)
     confidence = models.DecimalField(max_digits=5, decimal_places=4)
     model_version = models.CharField(max_length=64)
+    details = models.JSONField(default=dict, blank=True)
     processed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

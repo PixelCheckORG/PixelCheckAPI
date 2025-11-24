@@ -20,7 +20,7 @@ class Image(models.Model):
     size_bytes = models.PositiveIntegerField()
     width = models.PositiveIntegerField()
     height = models.PositiveIntegerField()
-    checksum = models.CharField(max_length=64, unique=True)
+    checksum = models.CharField(max_length=64, db_index=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
     created_at = models.DateTimeField(auto_now_add=True)
 
