@@ -1,21 +1,52 @@
 from __future__ import annotations
 
 import json
+import logging
 from io import BytesIO
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
-import torch
 from django.conf import settings
 from PIL import Image
-from torchvision import transforms
+
+logger = logging.getLogger(__name__)
+
+# Flags para ML
+ML_ENABLED = getattr(settings, "PIXELCHECK_ML_ENABLED", True)
+TORCH_AVAILABLE = False
+torch = None
+Resize = CenterCrop = Compose = Normalize = ToTensor = None
+
+# Intentar cargar torch/torchvision solo si ML está habilitado
+if ML_ENABLED:
+    try:
+        import torch as _torch
+        from torchvision.transforms import CenterCrop as _CenterCrop
+        from torchvision.transforms import Compose as _Compose
+        from torchvision.transforms import Normalize as _Normalize
+        from torchvision.transforms import Resize as _Resize
+        from torchvision.transforms import ToTensor as _ToTensor
+
+        torch = _torch
+        Resize = _Resize
+        CenterCrop = _CenterCrop
+        Compose = _Compose
+        Normalize = _Normalize
+        ToTensor = _ToTensor
+        TORCH_AVAILABLE = True
+        logger.info("Torch/torchvision cargados correctamente.")
+    except BaseException as exc:
+        TORCH_AVAILABLE = False
+        logger.error("No se pudo cargar torch/torchvision. ML desactivado. Error: %s", exc)
+else:
+    logger.info("PIXELCHECK_ML_ENABLED=False, se omite carga de torch/torchvision.")
 
 
 class PixelCheckInference:
     """
-    Carga el modelo entrenado (TorchScript) y expone un método predict para devolver label/confidence/detalles.
-    Implementa un patrón singleton simple para evitar recargar el modelo en cada request.
+    Carga el modelo entrenado (TorchScript) y expone un método predict.
+    Si ML está deshabilitado o torch no está disponible, opera en modo dummy.
     """
 
     _instance: "PixelCheckInference | None" = None
@@ -27,6 +58,15 @@ class PixelCheckInference:
         return cls._instance
 
     def __init__(self):
+        self.enabled = ML_ENABLED and TORCH_AVAILABLE
+        if not self.enabled:
+            self.metadata = {}
+            self.ai_index = 0
+            self.model = None
+            self.device = None
+            logger.warning("PixelCheckInference en modo dummy (ML deshabilitado o torch no disponible).")
+            return
+
         model_path = Path(settings.PIXELCHECK_MODEL_PATH)
         if not model_path.exists():
             raise FileNotFoundError(f"No se encontró el modelo en {model_path}")
@@ -38,22 +78,31 @@ class PixelCheckInference:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = torch.jit.load(model_path, map_location=self.device).eval()
 
-        self.transform = transforms.Compose(
+        self.transform = Compose(
             [
-                transforms.Resize((256, 256)),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                Resize((256, 256)),
+                CenterCrop(224),
+                ToTensor(),
+                Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
 
     def predict(self, image_bytes: bytes) -> Tuple[str, float, dict]:
         """
         Devuelve (label, confidence, details).
-        label: "AI" o "REAL"
-        confidence: probabilidad asociada al label elegido
-        details: incluye prob_ai, prob_real, threshold y features simples para UI.
+        Si ML está deshabilitado/no disponible, devuelve un resultado dummy seguro.
         """
+        if not self.enabled or not TORCH_AVAILABLE:
+            return "UNKNOWN", 0.5, {
+                "prob_ai": 0.5,
+                "prob_real": 0.5,
+                "threshold": float(settings.PIXELCHECK_THRESHOLD),
+                "model_version": settings.PIXELCHECK_MODEL_VERSION,
+                "metadata": self.metadata,
+                "features": {},
+                "observations": {},
+            }
+
         pil_img = Image.open(BytesIO(image_bytes)).convert("RGBA")
         tensor = self.transform(pil_img.convert("RGB")).unsqueeze(0).to(self.device)
 
@@ -86,27 +135,22 @@ class PixelCheckInference:
         arr = np.asarray(rgb_img, dtype=np.float32) / 255.0
         h, w, _ = arr.shape
 
-        # Diversidad de color: proporción de colores únicos (acotada a 1.0)
         uniq_colors = len(np.unique(arr.reshape(-1, 3), axis=0))
         color_score = float(min(1.0, uniq_colors / max(1, (h * w / 10_000))))
 
-        # Transparencia: si hay canal alpha y su promedio es bajo
         if img.mode == "RGBA":
             alpha = np.asarray(img.getchannel("A"), dtype=np.float32) / 255.0
             transparency_score = float(max(0.0, 1.0 - alpha.mean()))
         else:
             transparency_score = 0.0
 
-        # Ruido: desviación estándar en escala de grises (normalizada)
         gray = np.dot(arr[..., :3], [0.299, 0.587, 0.114])
         noise_raw = float(np.std(gray))
-        noise_score = float(min(1.0, noise_raw * 2.5))  # heurística
+        noise_score = float(min(1.0, noise_raw * 2.5))
 
-        # Watermark: contraste en altas frecuencias (muy simple)
         high_freq = np.abs(np.diff(gray, axis=0)).mean() + np.abs(np.diff(gray, axis=1)).mean()
         watermark_score = float(min(1.0, high_freq * 2.0))
 
-        # Simetría: compara izquierda/derecha
         mid = w // 2
         left = arr[:, :mid, :]
         right = np.fliplr(arr[:, -mid:, :])

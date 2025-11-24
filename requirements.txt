@@ -12,8 +12,7 @@ Pillow==10.4.0
 reportlab==4.2.2
 psycopg2-binary>=2.9.9
 gunicorn>=21.2.0
-# Evitar NumPy 2.x (torch 2.2.x se compila contra NumPy 1.x)
-numpy<2.0.0
+numpy==1.26.4
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.2.0+cpu
 torchvision==0.17.0+cpu
