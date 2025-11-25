@@ -1,0 +1,88 @@
+flowchart LR
+    Client((Cliente / Integraciones))
+
+    subgraph "API Layer (Django REST)"
+        AuthView["/auth (SignUp & SignIn)"]
+        UploadView["/images/upload"]
+        ResultView["/results/{imageId}"]
+        ReportView["/reports/{reportId}"]
+        AuditView["/system/audit (POST/GET)"]
+        HealthView["/analysis/health"]
+    end
+
+    subgraph "Application Layer (Use Cases)"
+        RegisterUC["RegisterUserUseCase"]
+        SignInUC["SignInUseCase"]
+        UploadUC["UploadImageUseCase"]
+        AnalyzeUC["AnalyzeImageUseCase"]
+        GetResultUC["GetResultUseCase"]
+        CreateReportUC["CreateReportUseCase"]
+        GetReportFileUC["GetReportFileUseCase"]
+        RecordAuditUC["RecordAuditEventUseCase"]
+        ListAuditUC["ListAuditLogsUseCase"]
+    end
+
+    subgraph "Domain & Infra"
+        UserRepo["DjangoUserRepository"]
+        ImageRepo["DjangoImageRepository"]
+        AnalysisRepo["DjangoAnalysisResultRepository"]
+        ResultsQueryRepo["DjangoResultsQueryRepository"]
+        ReportRepo["DjangoReportRepository"]
+        AuditRepo["DjangoAuditLogRepository"]
+        ImageGuard["shared.utils.image\n(validacion + checksum)"]
+        PixelCheck["PixelCheckInference"]
+        ReportBuilder["shared.utils.reporting\n(PDF/CSV)"]
+    end
+
+    subgraph "Persistencia"
+        UserDB[("iam_user + iam_role")]
+        ImageMeta[("ingestion_image")]
+        ImageBin[("ingestion_imagedata.content")]
+        AnalysisDB[("analysis_analysisresult")]
+        ReportDB[("results_report.content")]
+        AuditDB[("sysmgmt_auditlog")]
+        ModelStore[("models/pixelcheck/v1")]
+    end
+
+    subgraph "Async / ML"
+        CeleryQueue["Redis/Celery\nanalysis.run_analysis"]
+        CeleryWorker["Worker Celery"]
+    end
+
+    subgraph "Config"
+        Settings["config.settings\n+ metadata.json"]
+    end
+
+    Client --> AuthView
+    AuthView --> RegisterUC --> UserRepo --> UserDB
+    AuthView --> SignInUC --> UserDB
+    SignInUC --> JWT["JWT SimpleJWT"]
+
+    Client --> UploadView --> UploadUC
+    UploadUC --> ImageGuard
+    ImageGuard --> UploadUC
+    UploadUC --> ImageRepo --> ImageMeta
+    ImageRepo --> ImageBin
+    UploadUC --> CeleryQueue --> CeleryWorker --> AnalyzeUC
+    AnalyzeUC --> PixelCheck --> ModelStore
+    AnalyzeUC --> AnalysisRepo --> AnalysisDB
+    AnalyzeUC --"status= DONE"--> ImageMeta
+    AnalyzeUC --> Decision{"Uploader profesional/staff?"}
+    Decision -->|Si| CreateReportUC
+    Decision -->|No| Ready["Resultado disponible"]
+
+    CreateReportUC --> ResultsQueryRepo --> AnalysisDB
+    CreateReportUC --> ReportBuilder --> ReportRepo --> ReportDB
+    ReportBuilder --> ImageBin
+
+    Client --> ResultView --> GetResultUC --> ResultsQueryRepo
+    GetResultUC --> ReportHint["Adjunta reportId si aplica"]
+
+    Client --> ReportView --> GetReportFileUC --> ReportRepo --> ReportDB
+    GetReportFileUC --> Download["Respuesta binaria"]
+
+    Client --> AuditView
+    AuditView --> RecordAuditUC --> AuditRepo --> AuditDB
+    AuditView --> ListAuditUC --> AuditRepo
+
+    Client --> HealthView --> Settings
