@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils import timezone
 
 from analysis.models import AnalysisResult
@@ -91,29 +92,71 @@ class CreateReportUseCase(UseCase):
         except Image.DoesNotExist:
             pass
 
-        conclusion = (result.details or {}).get("conclusion", "N/A")
-        recommendation = (
-            "La imagen parece auténtica. Continúa con inspección visual si es crítico."
-            if result.label == "REAL"
-            else "Alta sospecha de generación IA. Recomendado someter a verificación manual adicional."
+        details = result.details or {}
+        conclusion = details.get("conclusion")
+        features = details.get("features", {})
+        observations = details.get("observations", {})
+        threshold = details.get("threshold", settings.PIXELCHECK_THRESHOLD)
+
+        confidence_pct = float(result.confidence) * 100
+        label_human = "contenido genuino" if result.label == "REAL" else "sintético / asistido por IA"
+
+        auto_conclusion = (
+            f"La evidencia algorítmica ubica la imagen dentro de la categoría de {label_human}, "
+            f"con {confidence_pct:.1f}% de confianza."
         )
-        features = (result.details or {}).get("features", {})
-        observations = (result.details or {}).get("observations", {})
+        if result.label == "REAL":
+            auto_conclusion += " No se observaron patrones persistentes de interpolación, réplicas especulares o artefactos de compresión propios de modelos generativos."
+        else:
+            auto_conclusion += " El clasificador detectó texturas suavizadas, geometrías repetidas y gradientes cromáticos muy uniformes típicos de motores generativos."
+        conclusion = conclusion or auto_conclusion
+
+        feature_labels = {
+            "color_score": "distribución cromática",
+            "noise_score": "nivel de ruido",
+            "symmetry_score": "simetría global",
+            "watermark_score": "rastros de marca",
+            "transparency_score": "transparencias/alpha",
+        }
+        ordered_features = sorted(features.items(), key=lambda item: item[1], reverse=True)
+        highlight = ", ".join(
+            f"{feature_labels.get(name, name.replace('_', ' '))} {value * 100:.0f}%"
+            for name, value in ordered_features[:2]
+        )
+        narrative_lines = [
+            f"PixelCheck analizó la imagen {image_id} empleando el modelo {result.model_version}.",
+            f"El motor clasificó la evidencia como {label_human} respaldándose en una confianza del {confidence_pct:.1f}%.",
+        ]
+        if highlight:
+            narrative_lines.append(f"Indicadores más influyentes: {highlight}.")
+
+        recommendation = (
+            "La imagen se considera auténtica; documenta el hallazgo y, "
+            "si es un caso crítico, conserva la cadena de custodia y agrega revisión humana final."
+        )
+        if result.label != "REAL":
+            recommendation = (
+                "Trata la imagen como posible generación IA. Registra el hallazgo, "
+                "solicita una verificación manual y, de ser necesario, "
+                "prioriza fuentes originales antes de difundirla."
+            )
 
         if report_format == Report.Format.PDF:
             summary = {
-                "Etiqueta": result.label,
-                "Confianza": f"{result.confidence:.2f}",
+                "Diagnóstico PixelCheck": label_human.upper(),
+                "Confianza": f"{confidence_pct:.1f}%",
                 "Modelo": result.model_version,
-                "Conclusión": conclusion,
+                "Identificador": image_id,
             }
             content = build_analysis_pdf(
-                title=f"PixelCheck Report {image_id}",
+                title=f"PixelCheck Report · Imagen {image_id}",
                 summary=summary,
                 features=features,
                 observations=observations,
                 recommendation=recommendation,
                 image_bytes=image_bytes,
+                narrative_lines=narrative_lines,
+                conclusion=conclusion,
             )
             return content, "application/pdf", f"pixelcheck-{image_id}-{timestamp}.pdf"
         headers = ["imageId", "label", "confidence", "modelVersion", "conclusion"]

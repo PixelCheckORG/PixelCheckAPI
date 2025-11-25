@@ -1,13 +1,21 @@
 import csv
 import io
+import textwrap
 from datetime import datetime
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, List, Optional
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
+
+
+def _draw_wrapped_lines(pdf, text: str, x: float, y: float, width: int = 95) -> float:
+    for line in textwrap.wrap(text, width=width):
+        pdf.drawString(x, y, line)
+        y -= 14
+    return y
 
 
 def build_pdf(content: Dict[str, str]) -> bytes:
@@ -35,6 +43,8 @@ def build_analysis_pdf(
     observations: Dict[str, str],
     recommendation: str,
     image_bytes: Optional[bytes] = None,
+    narrative_lines: Optional[List[str]] = None,
+    conclusion: Optional[str] = None,
 ) -> bytes:
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=LETTER)
@@ -67,11 +77,24 @@ def build_analysis_pdf(
         pdf.drawString(300, offset, f"{key}: {val}")
         offset -= 14
 
+    # Narrative
+    pdf.setFont("Helvetica-Bold", 12)
+    context_start = y - 30
+    pdf.drawString(50, context_start, "Contexto del análisis")
+    pdf.setFont("Helvetica", 10)
+    context_y = context_start - 16
+    if narrative_lines:
+        for paragraph in narrative_lines:
+            context_y = _draw_wrapped_lines(pdf, paragraph, 50, context_y)
+            context_y -= 4
+    else:
+        context_y -= 14
+
     # Features (bars)
     pdf.setFont("Helvetica-Bold", 12)
-    pdf.drawString(50, y - 20, "Métricas clave")
+    pdf.drawString(50, context_y - 10, "Métricas clave")
     pdf.setFont("Helvetica", 10)
-    bar_y = y - 40
+    bar_y = context_y - 30
     bar_width = 200
     for name, val in features.items():
         pdf.drawString(50, bar_y, f"{name.replace('_', ' ').title()}: {val:.2f}")
@@ -90,12 +113,19 @@ def build_analysis_pdf(
     for key, val in observations.items():
         pdf.drawString(50, obs_y, f"- {val}")
         obs_y -= 14
+    obs_y -= 4
+
+    if conclusion:
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(50, obs_y - 10, "Conclusión")
+        pdf.setFont("Helvetica", 10)
+        obs_y = _draw_wrapped_lines(pdf, conclusion, 50, obs_y - 26) - 6
 
     # Recommendation
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(50, obs_y - 10, "Recomendación")
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(50, obs_y - 26, recommendation)
+    _draw_wrapped_lines(pdf, recommendation, 50, obs_y - 26)
 
     pdf.showPage()
     pdf.save()
