@@ -10,7 +10,7 @@ from results.infrastructure.repositories import DjangoReportRepository
 
 
 class ReportDownloadView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     @extend_schema(
         responses={200: OpenApiResponse(response=OpenApiTypes.BINARY, description="Archivo de reporte")},

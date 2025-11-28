@@ -6,7 +6,7 @@ from iam.domain.value_objects import ROLE_PROFESSIONAL
 from results.domain.repositories import ReportRepository, ResultsQueryRepository
 from results.models import Report
 from shared.application.use_case import UseCase, UseCaseResult
-from shared.domain.exceptions import NotFoundError, PermissionError
+from shared.domain.exceptions import NotFoundError
 from shared.utils.reporting import build_analysis_pdf, build_csv
 from ingestion.models import Image, ImageData
 
@@ -28,9 +28,6 @@ class GetResultUseCase(UseCase):
         if not entity:
             raise NotFoundError("Resultado no disponible (en proceso o no existe)")
 
-        include_report = getattr(requester, "is_authenticated", False) and (
-            requester.has_role(ROLE_PROFESSIONAL) or requester.is_staff
-        )
         return UseCaseResult(
             success=True,
             data={
@@ -39,13 +36,12 @@ class GetResultUseCase(UseCase):
                 "confidence": entity.confidence,
                 "modelVersion": entity.model_version,
                 "details": entity.details,
-                "reportId": self._find_report_for_image(entity.image_id, requester) if include_report else None,
+                "reportId": self._find_report_for_image(entity.image_id),
             },
         )
 
-    def _find_report_for_image(self, image_id: str, requester):
-        # Busca reportes ya generados para este image_id
-        report = Report.objects.filter(filename__contains=image_id, owner=requester).order_by("-created_at").first()
+    def _find_report_for_image(self, image_id: str):
+        report = Report.objects.filter(filename__contains=image_id).order_by("-created_at").first()
         if report:
             return str(report.report_id)
         return None
@@ -57,8 +53,6 @@ class CreateReportUseCase(UseCase):
         self.report_repo = report_repo
 
     def execute(self, requester, image_id: str, report_format: str) -> UseCaseResult:
-        if not requester.has_role(ROLE_PROFESSIONAL) and not requester.is_staff:
-            raise PermissionError("Se requiere ROLE_PROFESSIONAL para crear reportes")
         result = self.results_repo.get_by_image(
             image_id=image_id, owner_id=str(requester.id), can_view_all=True
         )

@@ -4,6 +4,8 @@ from ingestion.models import Image
 from shared.application.use_case import UseCase, UseCaseResult
 from shared.domain.exceptions import ValidationError
 from shared.utils.image import calculate_checksum, ensure_valid_image
+from sysmgmt.application.use_cases import RecordAuditEventUseCase
+from sysmgmt.infrastructure.repositories import DjangoAuditLogRepository
 
 
 class UploadImageUseCase(UseCase):
@@ -27,4 +29,16 @@ class UploadImageUseCase(UseCase):
         }
         entity = self.repository.create(**payload)
         run_analysis_task.delay(str(entity.image_id))
+
+        RecordAuditEventUseCase(DjangoAuditLogRepository()).execute(
+            actor=uploader,
+            action="UPLOAD_IMAGE",
+            target=f"image:{entity.image_id}",
+            payload={
+                "filename": uploaded_file.name,
+                "status": entity.status,
+                "checksum": checksum,
+                "size_bytes": uploaded_file.size,
+            },
+        )
         return UseCaseResult(success=True, data={"imageId": entity.image_id, "status": entity.status})

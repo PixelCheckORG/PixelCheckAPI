@@ -9,7 +9,6 @@ from results.application.use_cases import CreateReportUseCase
 from results.infrastructure.repositories import DjangoReportRepository, DjangoResultsQueryRepository
 from shared.application.use_case import UseCase, UseCaseResult
 from shared.domain.exceptions import NotFoundError
-from iam.domain.value_objects import ROLE_PROFESSIONAL
 
 
 class AnalyzeImageUseCase(UseCase):
@@ -39,11 +38,10 @@ class AnalyzeImageUseCase(UseCase):
         image.status = Image.Status.DONE
         image.save(update_fields=["status"])
 
-        if image.uploader.has_role(ROLE_PROFESSIONAL) or image.uploader.is_staff:
-            # Autogenerar reporte PDF para profesionales/staff
-            CreateReportUseCase(DjangoResultsQueryRepository(), DjangoReportRepository()).execute(
-                requester=image.uploader,
-                image_id=str(image.image_id),
-                report_format="PDF",
-            )
+        # Autogenerar reporte PDF para cualquier uploader (incluye invitados)
+        CreateReportUseCase(DjangoResultsQueryRepository(), DjangoReportRepository()).execute(
+            requester=image.uploader,
+            image_id=str(image.image_id),
+            report_format="PDF",
+        )
         return UseCaseResult(success=True, data=entity)
